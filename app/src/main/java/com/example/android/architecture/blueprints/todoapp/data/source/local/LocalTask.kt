@@ -18,6 +18,7 @@ package com.example.android.architecture.blueprints.todoapp.data.source.local
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.example.android.architecture.blueprints.todoapp.data.Task
 
 @Entity(tableName = "task")
 data class LocalTask(
@@ -25,4 +26,22 @@ data class LocalTask(
     var title: String,
     var description: String,
     var isCompleted: Boolean,
+)
+
+// Convert a LocalTask to a Task
+fun LocalTask.toExternal() = Task(
+    id = id,
+    title = title,
+    description = description,
+    isCompleted = isCompleted,
+)
+
+// Convenience function which converts a list of LocalTasks to a list of Tasks
+fun List<LocalTask>.toExternal() = map(LocalTask::toExternal) // Equivalent to map {it.toExternal()}
+
+fun Task.toLocal() = LocalTask(
+    id = id,
+    title = title,
+    description = description,
+    isCompleted = isCompleted,
 )
