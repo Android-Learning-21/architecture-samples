@@ -19,6 +19,7 @@ package com.example.android.architecture.blueprints.todoapp.data.source.local
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.example.android.architecture.blueprints.todoapp.data.Task
+import com.example.android.architecture.blueprints.todoapp.data.source.network.NetworkTask
 
 @Entity(tableName = "task")
 data class LocalTask(
@@ -45,3 +46,12 @@ fun Task.toLocal() = LocalTask(
     description = description,
     isCompleted = isCompleted,
 )
+
+fun LocalTask.toNetwork() = NetworkTask(
+    id = id,
+    title = title,
+    shortDescription = description,
+    status = if (isCompleted) NetworkTask.TaskStatus.COMPLETE else NetworkTask.TaskStatus.ACTIVE
+)
+
+fun List<LocalTask>.toNetwork() = map(LocalTask::toNetwork)

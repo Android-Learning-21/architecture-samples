@@ -19,11 +19,17 @@ package com.example.android.architecture.blueprints.todoapp.data
 import com.example.android.architecture.blueprints.todoapp.data.source.local.TaskDao
 import com.example.android.architecture.blueprints.todoapp.data.source.local.toExternal
 import com.example.android.architecture.blueprints.todoapp.data.source.local.toLocal
+import com.example.android.architecture.blueprints.todoapp.data.source.local.toNetwork
 import com.example.android.architecture.blueprints.todoapp.data.source.network.TaskNetworkDataSource
+import com.example.android.architecture.blueprints.todoapp.data.source.network.toLocal
+import com.example.android.architecture.blueprints.todoapp.di.ApplicationScope
 import com.example.android.architecture.blueprints.todoapp.di.DefaultDispatcher
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
 import javax.inject.Inject
@@ -32,6 +38,7 @@ class DefaultTaskRepository @Inject constructor(
     private val localDataSource: TaskDao,
     private val networkDataSource: TaskNetworkDataSource,
     @DefaultDispatcher private val dispatcher: CoroutineDispatcher,
+    @ApplicationScope private val scope: CoroutineScope,
 ) {
     fun observeAll(): Flow<List<Task>> {
         return localDataSource.observeAll().map { tasks ->
@@ -47,6 +54,8 @@ class DefaultTaskRepository @Inject constructor(
             id = taskId
         )
         localDataSource.upsert(task.toLocal())
+        saveTasksToNetwork()
+
         return taskId
 
         /* Why don't you use withContext to wrap upsert() or toLocal(), like you did before?
@@ -61,6 +70,27 @@ class DefaultTaskRepository @Inject constructor(
 
     suspend fun complete(taskId: String) {
         localDataSource.updateCompleted(taskId, true)
+        saveTasksToNetwork()
     }
 
+    /** Replaces all the local tasks with those from the network */
+    suspend fun refresh() {
+        val networkTasks = networkDataSource.loadTasks()
+        localDataSource.deleteAll()
+        val localTasks = withContext(dispatcher) {
+            networkTasks.toLocal()
+        }
+        localDataSource.upsertAll(localTasks)
+    }
+
+    suspend fun saveTasksToNetwork() {
+        scope.launch {
+            val localTasks =
+                localDataSource.observeAll().first() // this will only save the first task, WTF?
+            val networkTasks = withContext(dispatcher) {
+                localTasks.toNetwork()
+            }
+            networkDataSource.saveTasks(networkTasks)
+        }
+    }
 }
